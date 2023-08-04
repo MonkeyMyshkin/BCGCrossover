@@ -1,0 +1,229 @@
+---
+title: "Vaccine efficacy estimates for the two modes of action of BCG in Cattle"
+author: "Andrew J K Conlan"
+date: "12/03/2021"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_data, echo=FALSE, warnings=FALSE,results=FALSE, message=FALSE}
+if(!require(tidyverse)){install.packages('tidyverse')}
+
+load('../Data/TestingData.RData')
+```
+
+# Discrete time chain binomial model to estimate vaccine efficacy
+
+We estimate transmission rates using a chain binomial model where we assume that the rate of susceptible animals acquiring infection per unit time is given by:
+
+\[ R(S\to I) = \beta \frac{(I+\epsilon_{I} I^{V})}{N}\]
+
+where $I$ is the number of infected (unvaccinated) animals, $I^{V}$ the number of vaccinated animals that subsequently became infected, $N$ is the size of the group and $\beta$ is the per capita transmission rate per infectious animal. The direct vaccine efficacy ($\epsilon_{S}$) reduces the rate that vaccinated animals become infected relative to controls. $\epsilon_{I}$ measures the reduction in infectiousness of vaccinated animals that become infected (again relative to unvaccinated controls.) 
+
+In formulating a chain binomial model we make the approximation that the rate of transmission is constant between the two time points and depends only on the time between the observations ($\Delta t$) and the values of the state variables ($S_{t},V_{t},I_{t},I^{V}_{t},N$) at the earlier time point. Assuming this the probability of transmission occurring in a discrete interval of time $\Delta t$ is:
+
+\[ P(S \to I) = 1 - e^{\Delta t \beta \frac{(I_{t-1}+\epsilon_{I} I_{t-1}^{V})}{N_{t-1}}} \]
+
+\[ P(V \to I^V) = 1 - e^{\Delta t \epsilon_{S} \beta \frac{(I_{t-1}+\epsilon_{I} I_{t-1}^{V})}{N_{t-1}}} \]
+
+The number of new cases ($C$) in the interval between $t$ and $\Delta t$ for susceptibles will then be:
+
+\[ C(t,t+\Delta t) \sim \mathrm{Binom}(S_{t}, P(S \to I)) \]
+
+and likewise for vaccinates ($C_{v}$):
+
+\[ C_{v}(t,t+\Delta t) \sim \mathrm{Binom}(S_{t}, P(S \to I)) \]
+
+As the probability of infection takes the same functional form as the complimentary log-log transformation, the transmission rate ($\beta$) and vaccine efficacy ($\epsilon_{S}$) can be estimated using a generalised linear model (GLM) with binomial response (and complementary log-log link function).
+
+## Logical infection history 
+
+Infectious status is inferred through the response to a set of candidate DIVA (Differentiates Infected from Vaccinated Animals) tests. For the two variants of the DIVA test (DST1 and DST10, IGRA and skin tests respectively) we construct a logical infection history where animals are considered to be infected - and potentially infectious - from the first positive test. For our main analysis we focus on the DST1 (IGRA) which was carried out at two monthly intervals for sentinal animals. The number of new infections per observation period within each group is calculated as the number of animals that switch diagnostic status within that interval. 
+
+In Phase II seeder animals were tested, but only at a lower frequency than the sentinels. As such, we need to number of seeder animals in groups 3 & 4 based on their status at the end of Phase I and end of Phase II. Given the small number of animals that changed status between these two points we did expect this to affect our results, but to carry out a sensitivity analysis we consider three methods of imputation. The default method (presented below) we change the status of seeder animals only at the point that additional tests were carried out. To set absolute upper and lower bounds we also considered the cases where seeders were assumed to be fixed to their status at the end of Phase I ("minimum") or end of Phase II ("maximum"). In Appendix 2 we present a comparison of the estimates based on these three methods of imputation and for the two alternative diagnostic tests (DST1 and DST10).
+
+### Logical infection history based on DST1 (IGRA) test status
+```{r summary_plots,echo=FALSE,warnings=FALSE,results=FALSE,message=FALSE,fig.path='Figs/',fig.width=4.76, fig.height=4.76}
+DST1_tot_def <- DST1_tot_def %>% mutate(Phase=1+as.numeric(is.element(Group,c(3,4))))
+DST1_tot_defp <- DST1_tot_def
+DST1_tot_defp <-DST1_tot_defp %>% mutate(Treatment=replace(Treatment,Treatment=='C','Unvaccinated'))
+DST1_tot_defp <-DST1_tot_defp %>% mutate(Treatment=replace(Treatment,Treatment=='V','Vaccinated'))
+
+p1=ggplot(DST1_tot_defp %>% group_by(t,Group,Treatment) %>% summarise(R=sum(R)),aes(x=as.numeric(t),y=R,col=Treatment)) + 
+  facet_wrap(~Group) + geom_line(size=2) + geom_point(size=3) + xlab('Time Post Exposure (Months)') + 
+  ylab('Cumulative Positive') + 
+  scale_x_continuous(breaks=unique(DST1_tot_defp$t)) + 
+  scale_colour_manual(values = c("#8DD4FB", "#97F788")) + 
+  theme(legend.position = c(0.75,0.3)) + ggtitle('A')+ theme(text = element_text(size = 10))  
+print(p1)
+```
+
+## Default model estimates
+
+We use the rstanarm package in R to estimate the model within a Bayesian framework and obtain posterior estimates for the vaccine efficacy and average base transmission rate within the two experimental barns. Convergence was assessed through standard MCMC diagnostics (presented in Appendix 1 below).
+
+```{r dst1bayes, warnings=FALSE,results=FALSE, message=FALSE,error=FALSE}
+require(rstanarm)
+require(ggplot2)
+
+# DST 1
+stan_glm.fit1<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
+family=binomial(link=cloglog),
+data=DST1_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+   
+
+bayes_eff = tibble(test='DST1',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2]))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit1)[,3])))
+
+
+bayes_R0 = tibble(test='DST1',group='Unvaccinated-Unvaccinated',R0=exp(as.data.frame(stan_glm.fit1)[,1])*365)
+bayes_R0 = bayes_R0 %>% bind_rows(tibble(test='DST1',group='Vaccinated-Unvaccinated',
+                                         R0=exp(rowSums(as.data.frame(stan_glm.fit1)[,1:2]))*365))
+bayes_R0 = bayes_R0 %>% bind_rows(tibble(test='DST1',group='Unvaccinated-Vaccinated',
+                                         R0=exp(rowSums(as.data.frame(stan_glm.fit1)[,c(1,3)]))*365))
+bayes_R0 = bayes_R0 %>% bind_rows(tibble(test='DST1',group='Vaccinated-Vaccinated',
+                                         R0=exp(rowSums(as.data.frame(stan_glm.fit1)[,c(1:3)]))*365))
+
+```
+
+### Posterior predictive checks
+
+In order to assess the fit of the estimated model we form baysian predictive p-values based on the proportion of zeros, maximum and mean values and find no evidence for a significant lack of fit.
+
+```{r post_check, warnings=FALSE,results=TRUE, message=FALSE,fig.path='Figs/',fig.width=4.76, fig.height=4.76}
+require(bayesplot)
+
+y <- DST1_tot_def$C
+
+y_pred <- posterior_predict(stan_glm.fit1)
+
+color_scheme_set("brightblue")
+ppc_dens_overlay(y, y_pred)
+
+ppc_hist(y, y_pred[1:5, ])
+
+prop_zero <- function(x) mean(x == 0)
+
+ppc_stat(y, y_pred, stat = "prop_zero", binwidth = 0.005)
+
+ppc_stat(y, y_pred, stat = "max")
+
+ppc_stat(y, y_pred, stat = "mean")
+
+```
+
+## Results (Main figure from manuscript)
+
+```{r compare_post, echo=FALSE, warnings=FALSE,results=TRUE, message=FALSE}
+
+credible <- function(x){data.frame(y=median(x),ymin=quantile(x,0.025),ymax=quantile(x,0.975))}
+
+p2=ggplot(bayes_eff, aes(x=100*(value),fill=efficacy,col=efficacy)) + geom_density(alpha=0.25) + xlab('% Efficacy') + labs(fill='Mode of Action',col='Mode of Action') + ylab('Posterior Density') + ggtitle('B') + 
+  theme(legend.position = c(0.25,0.70))+ theme(text = element_text(size = 10))  
+
+print(bayes_eff %>% group_by(efficacy) %>% summarise(e_s = signif(median(value),3), 
+                                           lower = signif(quantile(value,0.025),2), 
+                                           upper = signif(quantile(value,0.975),2)))
+```
+
+```{r compareR0, echo=FALSE, warnings=FALSE,results=TRUE, message=FALSE}
+credible <- function(x){data.frame(y=median(x),ymin=quantile(x,0.025),ymax=quantile(x,0.975))}
+
+p3=ggplot(bayes_R0, aes(x=R0,fill=as.factor(group),col=as.factor(group))) + geom_density(alpha=0.25) + xlab('Experimental R') + labs(fill='Sentinel-Seeder',col='Sentinel-Seeder') + geom_vline(xintercept=1,size=2) + ylab('Posterior Density') + 
+  theme(legend.position = c(0.66,0.75)) + ggtitle('C') + theme(text = element_text(size = 10))  
+
+print(bayes_R0 %>% group_by(test,group) %>% summarise(R = signif(median(R0),3), 
+                                           lower = signif(quantile(R0,0.025),2), 
+                                           upper = signif(quantile(R0,0.975),2)))
+
+
+```
+
+```{r main_figure, echo=FALSE, warnings=FALSE,results=TRUE, message=FALSE,fig.path='Figs/',fig.width=7, fig.height=5}
+require(patchwork)
+  print(p1+(p2/p3) + plot_layout(widths=c(3.75,3.25)))
+```
+
+# Appendix 1: model tables and untransformed parameter estimates 
+
+Vaccine efficacy and transmission parameters are calculated via log transforms of the raw parameters. In this appendix we present the regression output for the transformed parameters for reference, along with convergence statistics (Rhat, msce, n_eff).
+
+#### DST1
+
+```{r summary_dst1}
+summary(stan_glm.fit1)
+```
+
+# Appendix 2: Sensitivity analysis
+
+Comparison of estimates of vaccine efficacy for the two alternative diagnostic tests (DST1 & DST10) and three methods of imputing the status of seeder animals in Phase II. Estimates are consistent across all of the imputed trajectories.
+
+```{r sensitivity_analysis, echo=FALSE, warnings=FALSE,results=TRUE, message=FALSE}
+
+# DST 1
+stan_glm.fit1<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
+family=binomial(link=cloglog),
+data=DST1_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+   
+
+bayes_eff = tibble(test='DST1',imputation='Default',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2]))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Default',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit1)[,3])))
+
+stan_glm.fit1<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
+family=binomial(link=cloglog),
+data=DST1_tot_min %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+   
+
+bayes_eff = tibble(test='DST1',imputation='Minimum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2]))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Minimum',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit1)[,3])))
+
+stan_glm.fit1<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
+family=binomial(link=cloglog),
+data=DST1_tot_max %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+   
+
+bayes_eff = tibble(test='DST1',imputation='Maximum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2]))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Maximum',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit1)[,3])))
+
+
+stan_glm.fit10<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
+family=binomial(link=cloglog),
+data=DST10_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Default',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit10)[,2])))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Default',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit10)[,3])))
+
+stan_glm.fit10<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
+family=binomial(link=cloglog),
+data=DST10_tot_min %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Minimum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit10)[,2])))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Minimum',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit10)[,3])))
+
+stan_glm.fit10<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
+family=binomial(link=cloglog),
+data=DST10_tot_max %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Maximum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit10)[,2])))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Maximum',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit10)[,3])))
+```
+
+```{r compare_models, echo=FALSE, warnings=FALSE,results=TRUE, message=FALSE}
+
+credible <- function(x){data.frame(y=median(x),ymin=quantile(x,0.025),ymax=quantile(x,0.975))}
+
+ggplot(bayes_eff, aes(x=100*(value),fill=efficacy,col=efficacy)) + geom_density(alpha=0.25) + xlab('% Efficacy') + labs(fill='Efficacy',col='Efficacy') + facet_wrap(imputation~test)
+
+
+print(bayes_eff %>% group_by(test,imputation,efficacy) %>% summarise(e_s = signif(median(value),3), 
+                                           lower = signif(quantile(value,0.025),2), 
+                                           upper = signif(quantile(value,0.975),2))) %>%
+  arrange(efficacy,test,imputation)
+```
+
+
