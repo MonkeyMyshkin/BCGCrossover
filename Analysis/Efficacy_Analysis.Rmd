@@ -54,6 +54,9 @@ DST1_tot_defp <- DST1_tot_def
 DST1_tot_defp <-DST1_tot_defp %>% mutate(Treatment=replace(Treatment,Treatment=='C','Unvaccinated'))
 DST1_tot_defp <-DST1_tot_defp %>% mutate(Treatment=replace(Treatment,Treatment=='V','Vaccinated'))
 
+DST1_tot_def <- DST1_tot_def %>% mutate(Group = factor(Group))
+DST1_tot_def <- DST1_tot_def %>% mutate(Phase = factor(Phase))
+
 p1=ggplot(DST1_tot_defp %>% group_by(t,Group,Treatment) %>% summarise(R=sum(R)),aes(x=as.numeric(t),y=R,col=Treatment)) + 
   facet_wrap(~Group) + geom_line(size=2) + geom_point(size=3) + xlab('Time Post Exposure (Months)') + 
   ylab('Cumulative Positive') + 
@@ -63,9 +66,73 @@ p1=ggplot(DST1_tot_defp %>% group_by(t,Group,Treatment) %>% summarise(R=sum(R)),
 print(p1)
 ```
 
+## Interim analysis and comparison of attack rates between experimental groups
+
+An interim analysis was carried out at the end of Phase I to ensure that the one year contact time was sufficient to ensure that the stop/go conditions for progression to Phase II were satisfied:
+
+* An experimental reproduction ratio of > 1.5
+* That at least half of the unvaccinated sentinels had converted to be test-positive
+
+To estimate the experimental reproduction ratio we fitted a reduced model to the Phase I data with treatment as the only explanatory variable. Here we fit the same model to each experimental group in turn to explore the consistency of the attack rate within these barns.
+
+```{r dst1bayes_bygroup, warnings=FALSE,results=FALSE, message=FALSE,error=FALSE,fig.width=4.76, fig.height=4.76/2,fig.path='Figs/'}
+require(rstanarm)
+require(ggplot2)
+
+# Fit reduced model to each experimental group
+stan_glm.fitg1<-stan_glm(cbind(C,S) ~ Treatment + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
+family=binomial(link=cloglog),
+data=DST1_tot_def %>% filter(Group==1) %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+
+stan_glm.fitg2<-stan_glm(cbind(C,S) ~ Treatment + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
+family=binomial(link=cloglog),
+data=DST1_tot_def %>% filter(Group==2) %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+
+stan_glm.fitg3<-stan_glm(cbind(C,S) ~ Treatment + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
+family=binomial(link=cloglog),
+data=DST1_tot_def %>% filter(Group==3) %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+
+stan_glm.fitg4<-stan_glm(cbind(C,S) ~ Treatment + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
+family=binomial(link=cloglog),
+data=DST1_tot_def %>% filter(Group==4) %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+
+bayes_Rg = tibble(test='DST1',Group=1,treatment='Unvaccinated',R0=exp(as.data.frame(stan_glm.fitg1)[,1])*365)
+bayes_Rg = bayes_Rg %>% bind_rows(tibble(test='DST1',Group=1,treatment='Vaccinated',
+                                         R0=exp(rowSums(as.data.frame(stan_glm.fitg1)[,1:2]))*365))
+bayes_Rg = bayes_Rg %>% bind_rows(tibble(test='DST1',Group=2,treatment='Unvaccinated',
+                                         R0=exp(as.data.frame(stan_glm.fitg2)[,1])*365))
+bayes_Rg = bayes_Rg %>% bind_rows(tibble(test='DST1',Group=2,treatment='Vaccinated',
+                                         R0=exp(rowSums(as.data.frame(stan_glm.fitg2)[,1:2]))*365))
+bayes_Rg = bayes_Rg %>% bind_rows(tibble(test='DST1',Group=3,treatment='Unvaccinated',
+                                         R0=exp(as.data.frame(stan_glm.fitg3)[,1])*365))
+bayes_Rg = bayes_Rg %>% bind_rows(tibble(test='DST1',Group=3,treatment='Vaccinated',
+                                         R0=exp(rowSums(as.data.frame(stan_glm.fitg3)[,1:2]))*365))
+bayes_Rg = bayes_Rg %>% bind_rows(tibble(test='DST1',Group=4,treatment='Unvaccinated',
+                                         R0=exp(as.data.frame(stan_glm.fitg4)[,1])*365))
+bayes_Rg = bayes_Rg %>% bind_rows(tibble(test='DST1',Group=4,treatment='Vaccinated',
+                                         R0=exp(rowSums(as.data.frame(stan_glm.fitg4)[,1:2]))*365))
+
+bayes_Rg <- bayes_Rg %>% mutate(Group = factor(Group))
+
+ggplot(bayes_Rg,aes(x=R0,col=Group,fill=Group)) + 
+  geom_density(alpha=0.1) + 
+  facet_wrap(~treatment) + xlab('Experimental R')
+```
+
+```{r, warnings=FALSE, message=FALSE,error=FALSE}
+print(bayes_Rg %>% group_by(treatment,Group) %>% summarise(R = signif(median(R0),3), 
+                                           lower = signif(quantile(R0,0.025),2), 
+                                           upper = signif(quantile(R0,0.975),2)))
+
+```
+
 ## Default model estimates
 
-We use the rstanarm package in R to estimate the model within a Bayesian framework and obtain posterior estimates for the vaccine efficacy and average base transmission rate within the two experimental barns. Convergence was assessed through standard MCMC diagnostics (presented in Appendix 1 below).
+We use the rstanarm package in R to estimate the model within a Bayesian framework and obtain posterior estimates for the vaccine efficacy and average base transmission rate within the two experimental barns. Convergence was assessed through standard MCMC diagnostics (presented in more detail in Appendix 1 below).
+
+
+
+
 
 ```{r dst1bayes, warnings=FALSE,results=FALSE, message=FALSE,error=FALSE}
 require(rstanarm)
@@ -76,7 +143,11 @@ stan_glm.fit1<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S
 family=binomial(link=cloglog),
 data=DST1_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
    
+```
 
+
+
+```{R dst1_estimates, warnings=FALSE,results=FALSE, message=FALSE,error=FALSE}
 bayes_eff = tibble(test='DST1',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2]))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit1)[,3])))
 
@@ -123,7 +194,7 @@ ppc_stat(y, y_pred, stat = "mean")
 
 credible <- function(x){data.frame(y=median(x),ymin=quantile(x,0.025),ymax=quantile(x,0.975))}
 
-p2=ggplot(bayes_eff, aes(x=100*(value),fill=efficacy,col=efficacy)) + geom_density(alpha=0.25) + xlab('% Efficacy') + labs(fill='Mode of Action',col='Mode of Action') + ylab('Posterior Density') + ggtitle('B') + 
+p2=ggplot(bayes_eff, aes(x=100*(value),fill=efficacy,col=efficacy)) + geom_density(alpha=0.25) + xlab('% Efficacy') + labs(fill='Mode of Action',col='Mode of Action') + ylab('Posterior Density') + ggtitle('C') + 
   theme(legend.position = c(0.25,0.70))+ theme(text = element_text(size = 10))  
 
 print(bayes_eff %>% group_by(efficacy) %>% summarise(e_s = signif(median(value),3), 
@@ -135,7 +206,7 @@ print(bayes_eff %>% group_by(efficacy) %>% summarise(e_s = signif(median(value),
 credible <- function(x){data.frame(y=median(x),ymin=quantile(x,0.025),ymax=quantile(x,0.975))}
 
 p3=ggplot(bayes_R0, aes(x=R0,fill=as.factor(group),col=as.factor(group))) + geom_density(alpha=0.25) + xlab('Experimental R') + labs(fill='Sentinel-Seeder',col='Sentinel-Seeder') + geom_vline(xintercept=1,size=2) + ylab('Posterior Density') + 
-  theme(legend.position = c(0.66,0.75)) + ggtitle('C') + theme(text = element_text(size = 10))  
+  theme(legend.position = c(0.66,0.75)) + ggtitle('B') + theme(text = element_text(size = 10))  
 
 print(bayes_R0 %>% group_by(test,group) %>% summarise(R = signif(median(R0),3), 
                                            lower = signif(quantile(R0,0.025),2), 
@@ -146,7 +217,7 @@ print(bayes_R0 %>% group_by(test,group) %>% summarise(R = signif(median(R0),3),
 
 ```{r main_figure, echo=FALSE, warnings=FALSE,results=TRUE, message=FALSE,fig.path='Figs/',fig.width=7, fig.height=5}
 require(patchwork)
-  print(p1+(p2/p3) + plot_layout(widths=c(3.75,3.25)))
+  print(p1+(p3/p2) + plot_layout(widths=c(3.75,3.25)))
 ```
 
 # Appendix 1: model tables and untransformed parameter estimates 
