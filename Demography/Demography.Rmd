@@ -1,0 +1,76 @@
+---
+title: "Herd demography and estimated turnover rates"
+author: "Andrew J K Conlan"
+date: "15/08/2023"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,cache=TRUE)
+```
+
+# Load and reshape
+
+```{r load,echo=FALSE,results='hide',warnings=FALSE,error=FALSE}
+if(!require(tidyverse)){install.packages(tidyverse)}
+demo_df <- as_tibble(read.csv('../Data/ethicobots_demo.csv'))
+
+# Remove records with missing age
+demo_df <- demo_df %>% filter(!is.na(age))
+```
+
+Estimate constant removal rate (exponential demography) model. Aggregate across regions and herds (due to lack of variation and small sample sizes respectively).
+
+```{r exp_model,echo=FALSE,results='hide',warnings=FALSE,error=FALSE}
+if(!require(rstan)){install.packages(rstan)}
+if(!require(loo)){install.packages(loo)}
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+# Exclude herds with less than 20 animals
+keep_these<-names(which(tapply(demo_df$uni_herdid,demo_df$uni_herdid,length)>=20) )
+
+#keep_these<-names(which(tapply(combined_df$herdprev,combined_df$uni_herdid,min)<0.25))
+
+demo_df<-demo_df[which(is.element(demo_df$uni_herdid,keep_these)),]
+
+
+breaks=c(0,1,2,3,4,5,6,7,8,9,10,30)
+
+counts <- (do.call(rbind,tapply(demo_df$age,demo_df$uni_herdid,function(x){hist(x,breaks=breaks,plot=F)$counts})))
+
+
+# Aggregate across herds for mortality rate estimation given relatively small numbers in older age groups
+
+demo_dat <- list(no_herds=dim(counts)[1],
+                 age_bins=length(breaks)-1,
+                 breaks=breaks,
+                 widths=diff(breaks),
+                 counts=counts)
+
+fit_exp <- stan(file = 'Exponential_Mortality.stan', data = demo_dat, iter = 10000, 
+                       chains = 4, control = list(adapt_delta = 0.8))
+
+log_lik_exp <- extract_log_lik(fit_exp,c('log_lik'),merge_chains=FALSE)
+loo_exp <- loo(log_lik_exp, r_eff=relative_eff(exp(log_lik_exp)),cores=4,save_psis = TRUE)
+```
+
+Use leave-one-out cross validation (LOO) to check model fit.
+
+```{r exp_model_fit}
+print(loo_exp)
+plot(loo_exp)
+```
+
+No evidence of lack of fit. 
+
+# Estimated mortality rate
+
+```{r estimates}
+plot(fit_exp,pars='u[1]')
+
+write.table(data.frame(mean=mean(extract(fit_exp)$u0),sd=sd(extract(fit_exp)$u0)),'MortalityExp.csv')
+
+```
