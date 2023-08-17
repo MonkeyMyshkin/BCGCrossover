@@ -58,12 +58,20 @@ DST1_tot_def <- DST1_tot_def %>% mutate(Group = factor(Group))
 DST1_tot_def <- DST1_tot_def %>% mutate(Phase = factor(Phase))
 
 p1=ggplot(DST1_tot_defp %>% group_by(t,Group,Treatment) %>% summarise(R=sum(R)),aes(x=as.numeric(t),y=R,col=Treatment)) + 
-  facet_wrap(~Group) + geom_line(size=2) + geom_point(size=3) + xlab('Time Post Exposure (Months)') + 
+  facet_wrap(~Group) + geom_line(linewidth=2) + geom_point(size=3) + xlab('Time Post Exposure (Months)') + 
   ylab('Cumulative Positive') + 
   scale_x_continuous(breaks=unique(DST1_tot_defp$t)) + 
   scale_colour_manual(values = c("#8DD4FB", "#97F788")) + 
   theme(legend.position = c(0.75,0.3)) + ggtitle('A')+ theme(text = element_text(size = 10))  
 print(p1)
+
+p1a=ggplot(DST1_tot_defp %>% group_by(t,Group,Treatment) %>% summarise(S=sum(S)),aes(x=as.numeric(t),y=S[1]-S,col=Treatment)) + 
+  facet_wrap(~Group) + geom_line(linewidth=2) + geom_point(size=3) + xlab('Time Post Exposure (Months)') + 
+  ylab('Cumulative Positive') + 
+  scale_x_continuous(breaks=unique(DST1_tot_defp$t)) + 
+  scale_colour_manual(values = c("#8DD4FB", "#97F788")) + 
+  theme(legend.position = c(0.75,0.3)) + ggtitle('A')+ theme(text = element_text(size = 10))  
+
 ```
 
 ## Interim analysis and comparison of attack rates between experimental groups
@@ -150,12 +158,13 @@ data=DST1_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
 ```{R dst1_estimates, warnings=FALSE,results=FALSE, message=FALSE,error=FALSE}
 bayes_eff = tibble(test='DST1',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2]))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit1)[,3])))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',efficacy='Total',value=1-(exp(rowSums(as.data.frame(stan_glm.fit1)[,2:3])))))
 
 
 bayes_R0 = tibble(test='DST1',group='Unvaccinated-Unvaccinated',R0=exp(as.data.frame(stan_glm.fit1)[,1])*365)
-bayes_R0 = bayes_R0 %>% bind_rows(tibble(test='DST1',group='Vaccinated-Unvaccinated',
-                                         R0=exp(rowSums(as.data.frame(stan_glm.fit1)[,1:2]))*365))
 bayes_R0 = bayes_R0 %>% bind_rows(tibble(test='DST1',group='Unvaccinated-Vaccinated',
+                                         R0=exp(rowSums(as.data.frame(stan_glm.fit1)[,1:2]))*365))
+bayes_R0 = bayes_R0 %>% bind_rows(tibble(test='DST1',group='Vaccinated-Unvaccinated',
                                          R0=exp(rowSums(as.data.frame(stan_glm.fit1)[,c(1,3)]))*365))
 bayes_R0 = bayes_R0 %>% bind_rows(tibble(test='DST1',group='Vaccinated-Vaccinated',
                                          R0=exp(rowSums(as.data.frame(stan_glm.fit1)[,c(1:3)]))*365))
@@ -195,7 +204,7 @@ ppc_stat(y, y_pred, stat = "mean")
 credible <- function(x){data.frame(y=median(x),ymin=quantile(x,0.025),ymax=quantile(x,0.975))}
 
 p2=ggplot(bayes_eff, aes(x=100*(value),fill=efficacy,col=efficacy)) + geom_density(alpha=0.25) + xlab('% Efficacy') + labs(fill='Mode of Action',col='Mode of Action') + ylab('Posterior Density') + ggtitle('C') + 
-  theme(legend.position = c(0.25,0.70))+ theme(text = element_text(size = 10))  
+  theme(legend.position = c(0.23,0.65))+ theme(text = element_text(size = 10))  
 
 print(bayes_eff %>% group_by(efficacy) %>% summarise(e_s = signif(median(value),3), 
                                            lower = signif(quantile(value,0.025),2), 
@@ -205,7 +214,7 @@ print(bayes_eff %>% group_by(efficacy) %>% summarise(e_s = signif(median(value),
 ```{r compareR0, echo=FALSE, warnings=FALSE,results=TRUE, message=FALSE}
 credible <- function(x){data.frame(y=median(x),ymin=quantile(x,0.025),ymax=quantile(x,0.975))}
 
-p3=ggplot(bayes_R0, aes(x=R0,fill=as.factor(group),col=as.factor(group))) + geom_density(alpha=0.25) + xlab('Experimental R') + labs(fill='Sentinel-Seeder',col='Sentinel-Seeder') + geom_vline(xintercept=1,size=2) + ylab('Posterior Density') + 
+p3=ggplot(bayes_R0, aes(x=R0,fill=as.factor(group),col=as.factor(group))) + geom_density(alpha=0.25) + xlab('Experimental R') + labs(fill='Seeder-Sentinel',col='Seeder-Sentinel') + geom_vline(xintercept=1,size=2) + ylab('Posterior Density') + 
   theme(legend.position = c(0.66,0.75)) + ggtitle('B') + theme(text = element_text(size = 10))  
 
 print(bayes_R0 %>% group_by(test,group) %>% summarise(R = signif(median(R0),3), 
@@ -244,23 +253,25 @@ data=DST1_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
 
 bayes_eff = tibble(test='DST1',imputation='Default',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2]))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Default',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit1)[,3])))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Default',efficacy='Total',value=1-(exp(rowSums(as.data.frame(stan_glm.fit1)[,2:3])))))
 
 stan_glm.fit1<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
 data=DST1_tot_min %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
    
 
-bayes_eff = tibble(test='DST1',imputation='Minimum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2]))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Minimum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2])))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Minimum',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit1)[,3])))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Minimum',efficacy='Total',value=1-(exp(rowSums(as.data.frame(stan_glm.fit1)[,2:3])))))
 
 stan_glm.fit1<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
 data=DST1_tot_max %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
    
 
-bayes_eff = tibble(test='DST1',imputation='Maximum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2]))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Maximum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2])))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Maximum',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit1)[,3])))
-
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Maximum',efficacy='Total',value=1-(exp(rowSums(as.data.frame(stan_glm.fit1)[,2:3])))))
 
 stan_glm.fit10<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
@@ -268,6 +279,7 @@ data=DST10_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
 
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Default',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit10)[,2])))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Default',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit10)[,3])))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Default',efficacy='Total',value=1-(exp(rowSums(as.data.frame(stan_glm.fit10)[,2:3])))))
 
 stan_glm.fit10<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
@@ -275,6 +287,7 @@ data=DST10_tot_min %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
 
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Minimum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit10)[,2])))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Minimum',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit10)[,3])))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Minimum',efficacy='Total',value=1-(exp(rowSums(as.data.frame(stan_glm.fit10)[,2:3])))))
 
 stan_glm.fit10<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
@@ -282,6 +295,8 @@ data=DST10_tot_max %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
 
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Maximum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit10)[,2])))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Maximum',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit10)[,3])))
+bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Maximum',efficacy='Total',value=1-(exp(rowSums(as.data.frame(stan_glm.fit10)[,2:3])))))
+
 ```
 
 ```{r compare_models, echo=FALSE, warnings=FALSE,results=TRUE, message=FALSE}
