@@ -32,8 +32,8 @@ study_farms<-cowplot::plot_grid(
 
 # extract the legend from one of the prevalence plots to assign single legend
 legend_prev <- cowplot::get_legend(
-  prev_animals + 
-  theme(legend.box.margin = margin(t=15, r=0.5, b=5, l=0.5)))
+  prev_farms + 
+  theme(legend.box.margin = margin(t=15, r=0.5, b=5, l=165)))
 
 #combine prevalence figures
 prev<-cowplot::plot_grid(
@@ -42,7 +42,7 @@ prev<-cowplot::plot_grid(
           axis.title.x = element_blank(), axis.text.x = element_blank()), 
   prev_farms +
     theme(legend.position = "none"), 
-  rel_heights = c(0.84, 1), labels = c("C", ""),
+  rel_heights = c(0.86, 1), labels = c("C", ""),
   label_size=40,
   label_x=-0.006, 
   label_y=1.01,
@@ -90,8 +90,8 @@ prev<-cowplot::plot_grid(
 
 # extract the legend from one of the prevalence plots to assign single legend
 legend_prev <- cowplot::get_legend(
-  prev_animals + 
-    theme(legend.box.margin = margin(0.5, 0.5, 105, 0.5)) 
+  prev_farms + 
+    theme(legend.box.margin = margin(0.5, 0.5, 165, 0.5)) 
 )
 
 
