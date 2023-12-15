@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r load_data, echo=FALSE, warnings=FALSE,results=FALSE, message=FALSE}
 if(!require(tidyverse)){install.packages('tidyverse')}
+if(!require(rstanarm)){install.packages('rstanarm')}
 
 load('../Data/TestingData.RData')
 ```
@@ -41,11 +42,26 @@ and likewise for vaccinates ($C_{v}$):
 
 As the probability of infection takes the same functional form as the complimentary log-log transformation, the transmission rate ($\beta$) and vaccine efficacy ($\epsilon_{S}$) can be estimated using a generalised linear model (GLM) with binomial response (and complementary log-log link function).
 
+##  Loss of animals and staggered test dates during Phase II
+
+As per the experimental protocol a number of animals had to be euthanized on welfare grounds before the end of the experiment. A total of 5, 4, 4, and 3 animals in total were removed early from groups 1,2,3 and 4 respectively. The majority of removals in each group (except for group 3) were seeders consisting of 3/5, 3/4, 1/4 and 2/3 respectively. 
+
+```{r} 
+ggplot(DST1_tot_def %>% filter(Treatment == 'C') %>% group_by(Group,t,Batch) %>% select(N_S) %>% arrange(Group,t),aes(x=t,y=N_S,col=Batch)) + geom_path() + facet_wrap(~Group) + geom_point() + xlab('Time') + ylab('Number of Seeders')
+```
+
+
+For the purposes of analysis we assume that the number of infectious animals for each interval between successive tests consists of the total number of seeder animals and sentinel animals with a previous positive test result that were present within the barn for the whole period. Sentinel animals that were removed before testing positive will not contribute to estimates of transmission rates except with respect to the size of the group which is also updated for each observation interval. In Phase II, delays in the recruitment of calves meant that there were two parallel entry points into Groups 3 and 4. As a consequence the numbers of infectious (and surviving) animals between successive tests are different for these two batches of animals (I and II) and for analysis are treated as two subgroups.
+
+```{r} 
+ggplot(DST1_tot_def %>% filter(Treatment == 'C') %>% group_by(Group,t,Batch) %>% select(N) %>% arrange(Group,t),aes(x=t,y=N,col=Batch)) + geom_path() + facet_wrap(~Group) + geom_point() + xlab('Time') + ylab('Group Size')
+```
+
 ## Logical infection history 
 
-Infectious status is inferred through the response to a set of candidate DIVA (Differentiates Infected from Vaccinated Animals) tests. For the two variants of the DIVA test (DST1 and DST10, IGRA and skin tests respectively) we construct a logical infection history where animals are considered to be infected - and potentially infectious - from the first positive test. For our main analysis we focus on the DST1 (IGRA) which was carried out at two monthly intervals for sentinal animals. The number of new infections per observation period within each group is calculated as the number of animals that switch diagnostic status within that interval. 
+Infectious status is inferred through the response to a set of candidate DIVA (Differentiates Infected from Vaccinated Animals) tests. For the two variants of the DIVA test (DST1 and DST10, IGRA and skin tests respectively) we construct a logical infection history where animals are considered to be infected - and potentially infectious - from the first positive test. For our main analysis we focus on the DST1 (IGRA) which was carried out at two monthly intervals for sentinel animals. The number of new infections per observation period within each group is calculated as the number of animals that switch diagnostic status within that interval. 
 
-In Phase II seeder animals were tested, but only at a lower frequency than the sentinels. As such, we need to number of seeder animals in groups 3 & 4 based on their status at the end of Phase I and end of Phase II. Given the small number of animals that changed status between these two points we did expect this to affect our results, but to carry out a sensitivity analysis we consider three methods of imputation. The default method (presented below) we change the status of seeder animals only at the point that additional tests were carried out. To set absolute upper and lower bounds we also considered the cases where seeders were assumed to be fixed to their status at the end of Phase I ("minimum") or end of Phase II ("maximum"). In Appendix 2 we present a comparison of the estimates based on these three methods of imputation and for the two alternative diagnostic tests (DST1 and DST10).
+In Phase II seeder animals were tested, but only at a lower frequency than the sentinels. As such, we need to impute number of infectious seeder animals in groups 3 & 4 based on their status at the end of Phase I and end of Phase II. Given the small number of animals that changed status between these two points we did not expect this to affect our results, but to carry out a sensitivity analysis we considered three methods of imputation. The default method (presented below) we change the status of seeder animals only at the point that additional tests were carried out. To set absolute upper and lower bounds we also considered the cases where seeders were assumed to be fixed to their status at the end of Phase I ("minimum") or end of Phase II ("maximum"). In Appendix 2 we present a comparison of the estimates based on these three methods of imputation and for the two alternative diagnostic tests (DST1 and DST10).
 
 ### Logical infection history based on DST1 (IGRA) test status
 ```{r summary_plots,echo=FALSE,warnings=FALSE,results=FALSE,message=FALSE,fig.path='Figs/',fig.width=4.76, fig.height=4.76}
@@ -57,7 +73,7 @@ DST1_tot_defp <-DST1_tot_defp %>% mutate(Treatment=replace(Treatment,Treatment==
 DST1_tot_def <- DST1_tot_def %>% mutate(Group = factor(Group))
 DST1_tot_def <- DST1_tot_def %>% mutate(Phase = factor(Phase))
 
-p1=ggplot(DST1_tot_defp %>% group_by(t,Group,Treatment) %>% summarise(R=sum(R)),aes(x=as.numeric(t),y=R,col=Treatment)) + 
+p1=ggplot(DST1_tot_defp %>% group_by(t,Group,Treatment) %>% summarise(R=sum(R+C)),aes(x=as.numeric(t),y=R,col=Treatment)) + 
   facet_wrap(~Group) + geom_line(linewidth=2) + geom_point(size=3) + xlab('Time Post Exposure (Months)') + 
   ylab('Cumulative Positive') + 
   scale_x_continuous(breaks=unique(DST1_tot_defp$t)) + 
@@ -83,26 +99,23 @@ An interim analysis was carried out at the end of Phase I to ensure that the one
 
 To estimate the experimental reproduction ratio we fitted a reduced model to the Phase I data with treatment as the only explanatory variable. Here we fit the same model to each experimental group in turn to explore the consistency of the attack rate within these barns.
 
-```{r dst1bayes_bygroup, warnings=FALSE,results=FALSE, message=FALSE,error=FALSE,fig.width=4.76, fig.height=4.76/2,fig.path='Figs/'}
-require(rstanarm)
-require(ggplot2)
-
+```{r dst1bayes_bygroup, warnings=FALSE,results=FALSE, message=FALSE,error=FALSE,fig.width=4.76, fig.height=4.76/2,fig.path='Figs/',cache=TRUE}
 # Fit reduced model to each experimental group
 stan_glm.fitg1<-stan_glm(cbind(C,S) ~ Treatment + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
-data=DST1_tot_def %>% filter(Group==1) %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+data=DST1_tot_def %>% filter(Group==1) %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0,chains = 8, iter = 20000)
 
 stan_glm.fitg2<-stan_glm(cbind(C,S) ~ Treatment + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
-data=DST1_tot_def %>% filter(Group==2) %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+data=DST1_tot_def %>% filter(Group==2) %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0,chains = 8, iter = 20000)
 
 stan_glm.fitg3<-stan_glm(cbind(C,S) ~ Treatment + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
-data=DST1_tot_def %>% filter(Group==3) %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+data=DST1_tot_def %>% filter(Group==3) %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0,chains = 8, iter = 20000)
 
 stan_glm.fitg4<-stan_glm(cbind(C,S) ~ Treatment + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
-data=DST1_tot_def %>% filter(Group==4) %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+data=DST1_tot_def %>% filter(Group==4) %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0,chains = 8, iter = 20000)
 
 bayes_Rg = tibble(test='DST1',Group=1,treatment='Unvaccinated',R0=exp(as.data.frame(stan_glm.fitg1)[,1])*365)
 bayes_Rg = bayes_Rg %>% bind_rows(tibble(test='DST1',Group=1,treatment='Vaccinated',
@@ -132,24 +145,34 @@ print(bayes_Rg %>% group_by(treatment,Group) %>% summarise(R = signif(median(R0)
                                            lower = signif(quantile(R0,0.025),2), 
                                            upper = signif(quantile(R0,0.975),2)))
 
+# Unvaccinated treatment, want to compare R from group 4 to groups 1,2,3
+
+group_4 <- unlist(bayes_Rg %>% filter(Group==4 & treatment=='Unvaccinated') %>% select(R0))
+group_123 <- unlist(bayes_Rg %>% filter(Group!=4 & treatment=='Unvaccinated') %>% select(R0))
+
+
+# Vaccinated treatment, want to compare R from groups 3,4 to groups 1 & 2
+
+group_3v <- unlist(bayes_Rg %>% filter(Group==3 & treatment=='Vaccinated') %>% select(R0))
+group_4v <- unlist(bayes_Rg %>% filter(Group==4 & treatment=='Vaccinated') %>% select(R0))
+group_12v <- unlist(bayes_Rg %>% filter(Group!=3 & Group!=4 & treatment=='Vaccinated') %>% select(R0))
+
+
 ```
+
+The posterior probability that the transmission rate in group 4 is less than groups 1-3 is `r (signif(mean(sample(group_4,8000,replace=TRUE) < sample(group_123,8000,replace=TRUE)),2))`. The posterior probability that the transmission rate in group 3 is less than in groups 1&2 is `r (signif(mean(sample(group_3v,8000,replace=TRUE) < sample(group_12v,8000,replace=TRUE)),2))`. The posterior probability that the transmission rate in group 4 is less than in groups 1&2 is `r (signif(mean(sample(group_4v,8000,replace=TRUE) < sample(group_12v,8000,replace=TRUE)),2))`. 
+
 
 ## Default model estimates
 
 We use the rstanarm package in R to estimate the model within a Bayesian framework and obtain posterior estimates for the vaccine efficacy and average base transmission rate within the two experimental barns. Convergence was assessed through standard MCMC diagnostics (presented in more detail in Appendix 1 below).
 
 
-
-
-
-```{r dst1bayes, warnings=FALSE,results=FALSE, message=FALSE,error=FALSE}
-require(rstanarm)
-require(ggplot2)
-
+```{r dst1bayes, warnings=FALSE,results=FALSE, message=FALSE,error=FALSE,cache=TRUE}
 # DST 1
 stan_glm.fit1<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
-data=DST1_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+data=DST1_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0,chains = 8, iter = 20000)
    
 ```
 
@@ -168,7 +191,12 @@ bayes_R0 = bayes_R0 %>% bind_rows(tibble(test='DST1',group='Vaccinated-Unvaccina
 bayes_R0 = bayes_R0 %>% bind_rows(tibble(test='DST1',group='Vaccinated-Vaccinated',
                                          R0=exp(rowSums(as.data.frame(stan_glm.fit1)[,c(1:3)]))*365))
 
+direct <- bayes_eff %>% filter(efficacy=='Susceptibility') %>% select(value)
+indirect <- bayes_eff %>% filter(efficacy=='Infectiousness') %>% select(value)
+
 ```
+
+The posterior probability that the efficacy to reduce infectiousness is greater than the direct protection is: `r mean(indirect>direct)`.
 
 ### Posterior predictive checks
 
@@ -218,7 +246,8 @@ p3=ggplot(bayes_R0, aes(x=R0,fill=as.factor(group),col=as.factor(group))) + geom
 
 print(bayes_R0 %>% group_by(test,group) %>% summarise(R = signif(median(R0),3), 
                                            lower = signif(quantile(R0,0.025),2), 
-                                           upper = signif(quantile(R0,0.975),2)))
+                                           upper = signif(quantile(R0,0.975),2),
+                                           prob_1 = signif(mean(R0<=1),2)))
 
 
 ```
@@ -242,12 +271,12 @@ summary(stan_glm.fit1)
 
 Comparison of estimates of vaccine efficacy for the two alternative diagnostic tests (DST1 & DST10) and three methods of imputing the status of seeder animals in Phase II. Estimates are consistent across all of the imputed trajectories.
 
-```{r sensitivity_analysis, echo=FALSE, warnings=FALSE,results=TRUE, message=FALSE}
+```{r sensitivity_analysis, echo=FALSE, warnings=FALSE,results=TRUE, message=FALSE,cache=TRUE}
 
 # DST 1
 stan_glm.fit1<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
-data=DST1_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+data=DST1_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0,chains = 8, iter = 20000)
    
 
 bayes_eff = tibble(test='DST1',imputation='Default',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2]))
@@ -256,7 +285,7 @@ bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Default',effi
 
 stan_glm.fit1<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
-data=DST1_tot_min %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+data=DST1_tot_min %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0,chains = 8, iter = 20000)
    
 
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Minimum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2])))
@@ -265,7 +294,7 @@ bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Minimum',effi
 
 stan_glm.fit1<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
-data=DST1_tot_max %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+data=DST1_tot_max %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0,chains = 8, iter = 20000)
    
 
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Maximum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit1)[,2])))
@@ -274,7 +303,7 @@ bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',imputation='Maximum',effi
 
 stan_glm.fit10<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
-data=DST10_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+data=DST10_tot_def %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0,chains = 8, iter = 20000)
 
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Default',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit10)[,2])))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Default',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit10)[,3])))
@@ -282,7 +311,7 @@ bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Default',eff
 
 stan_glm.fit10<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
-data=DST10_tot_min %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+data=DST10_tot_min %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0,chains = 8, iter = 20000)
 
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Minimum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit10)[,2])))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Minimum',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit10)[,3])))
@@ -290,7 +319,7 @@ bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Minimum',eff
 
 stan_glm.fit10<-stan_glm(cbind(C,S) ~ Treatment + FIV + offset(log(deltat*(IC+I_S+IV+IV_S)/N)),
 family=binomial(link=cloglog),
-data=DST10_tot_max %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0)
+data=DST10_tot_max %>% mutate(FIV=(IV+IV_S)/(IC+IV+IV_S+I_S)),refresh=0,chains = 8, iter = 20000)
 
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Maximum',efficacy='Susceptibility',value=1-exp(as.data.frame(stan_glm.fit10)[,2])))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Maximum',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit10)[,3])))
@@ -298,18 +327,21 @@ bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Maximum',eff
 
 ```
 
+
 ```{r compare_models, echo=FALSE, warnings=FALSE,results=TRUE, message=FALSE}
 
 credible <- function(x){data.frame(y=median(x),ymin=quantile(x,0.025),ymax=quantile(x,0.975))}
 
-ggplot(bayes_eff, aes(x=100*(value),fill=efficacy,col=efficacy)) + geom_density(alpha=0.25) + xlab('% Efficacy') + labs(fill='Efficacy',col='Efficacy') + facet_wrap(imputation~test)
+ggplot(bayes_eff, aes(y=factor(efficacy),x=100*(value),col=imputation)) + stat_summary(fun.data=credible,position=position_dodge(0.5)) + xlab('% Efficacy') + labs(col='Imputation Method')  + ylab('Mode of Vaccine Efficacy') + facet_wrap(~test)
 
 
-print(bayes_eff %>% group_by(test,imputation,efficacy) %>% summarise(e_s = signif(median(value),3), 
-                                           lower = signif(quantile(value,0.025),2), 
-                                           upper = signif(quantile(value,0.975),2))) %>%
+print(bayes_eff %>% group_by(test,imputation,efficacy) %>% summarise(e_s = signif(100*median(value),2), 
+                                           lower = signif(100*quantile(value,0.025),2), 
+                                           upper = signif(100*quantile(value,0.975),2))) %>%
   arrange(efficacy,test,imputation)
 ```
+
+
 # Save posterior draws
 ```{r}
 dst1_post <- tibble(beta=exp(as.data.frame(stan_glm.fitg1)[,1]),
@@ -320,6 +352,8 @@ dst10_post <- tibble(beta=exp(as.data.frame(stan_glm.fit10)[,1]),
                     eff_S=1-exp(as.data.frame(stan_glm.fit10)[,2]),
                     eff_I=1-exp(as.data.frame(stan_glm.fit10)[,3]))
 
-save.image('../Posterior/dst_post.RData')
+save(dst1_post,dst10_post,file='../Posterior/dst_post.RData')
+write.table(dst1_post,file='../Posterior/dst1_post.csv',row.names=FALSE)
+write.table(dst10_post,file='../Posterior/dst10_post.csv',row.names=FALSE)
 ```
 
