@@ -160,7 +160,6 @@ bayes_eff = tibble(test='DST1',efficacy='Susceptibility',value=1-exp(as.data.fra
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit1)[,3])))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST1',efficacy='Total',value=1-(exp(rowSums(as.data.frame(stan_glm.fit1)[,2:3])))))
 
-
 bayes_R0 = tibble(test='DST1',group='Unvaccinated-Unvaccinated',R0=exp(as.data.frame(stan_glm.fit1)[,1])*365)
 bayes_R0 = bayes_R0 %>% bind_rows(tibble(test='DST1',group='Unvaccinated-Vaccinated',
                                          R0=exp(rowSums(as.data.frame(stan_glm.fit1)[,1:2]))*365))
@@ -311,5 +310,16 @@ print(bayes_eff %>% group_by(test,imputation,efficacy) %>% summarise(e_s = signi
                                            upper = signif(quantile(value,0.975),2))) %>%
   arrange(efficacy,test,imputation)
 ```
+# Save posterior draws
+```{r}
+dst1_post <- tibble(beta=exp(as.data.frame(stan_glm.fitg1)[,1]),
+                    eff_S=1-exp(as.data.frame(stan_glm.fit1)[,2]),
+                    eff_I=1-exp(as.data.frame(stan_glm.fit1)[,3]))
 
+dst10_post <- tibble(beta=exp(as.data.frame(stan_glm.fit10)[,1]),
+                    eff_S=1-exp(as.data.frame(stan_glm.fit10)[,2]),
+                    eff_I=1-exp(as.data.frame(stan_glm.fit10)[,3]))
+
+save.image('../Posterior/dst_post.RData')
+```
 

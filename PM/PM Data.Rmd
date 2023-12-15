@@ -1,0 +1,118 @@
+---
+title: "Endpoint Vaccine Efficacy (PM, DST 1 and DST 10)"
+author: "Andrew J K Conlan"
+date: "2023-09-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load and reshape data
+
+```{r load_data, echo=FALSE, warnings=FALSE,results=FALSE, message=FALSE}
+if(!require(tidyverse)){install.packages('tidyverse')}
+
+load('../Data/TestingData.RData')
+vl_df <- readxl::read_excel('../Data/VL Score of Seeders and Sentinels.xlsx')
+vl_df2 <- readxl::read_excel('../Data/VL Score of Seeders and Sentinels.xlsx',sheet=2)
+
+vl_df2 <- vl_df2 %>% select(-Group) %>% mutate(Group=Exposure,.before=Batch) %>% select(-Exposure,-Role)
+vl_df <- vl_df %>% mutate(Batch=NA,.after=Group) %>% select(-Role)
+
+vl_df <-vl_df %>% mutate(Treatment = replace(Treatment, Treatment == "C", "Control"))
+vl_df <-vl_df %>% mutate(Treatment = replace(Treatment, Treatment == "V", "Vaccinate"))
+
+vl_df2 <- vl_df2 %>% mutate(Group = replace(Group, Group == "Control", 3))
+vl_df2 <- vl_df2 %>% mutate(Group = replace(Group, Group == "Vaccinate", 4))
+vl_df2 <- vl_df2 %>% mutate(Group=as.numeric(Group))
+
+vl_df <- vl_df %>% bind_rows(vl_df2)
+rm(vl_df2)
+```
+
+```{r, echo=FALSE, warnings=FALSE,results=FALSE, message=FALSE}
+vl_df %>% group_by(Group,Treatment,OrganPM) %>% summarise(mean(VL=='Yes')) %>% print(n=56)
+
+DST1_tot_def %>% filter(t==max(t)) %>% group_by(Group,Treatment) %>% summarise(R/N_S)
+
+DST1_tot_def %>% group_by(Group,Treatment) %>% summarise(C=sum(C),N=max(N_S)) %>% mutate(ratio=C/N)
+
+
+DST10_tot_def %>% group_by(Group,Treatment) %>% summarise(C=sum(C),N=max(N_S)) %>% mutate(ratio=C/N)
+
+
+vl_df %>% filter(OrganPM=='Total') %>% group_by(Group,Treatment) %>% summarise(VL=sum(VL=='Yes'),N=n()) 
+
+```
+
+# Calculate endpoint efficacy (relative risk)
+
+```{r}
+# Calculate confidence intervals for relative risk by simulation
+# https://api.rpubs.com/juanhklopper/RelativeRiskConfidenceIntervals
+
+simulate_group <- function(n, p){
+  xs = runif(n)
+  k = sum(xs < p)
+  return(k / n)
+}
+
+simulate_trial <- function(n1, p1, n2, p2){
+  risk1 = simulate_group(n1, p1)
+  risk2 = simulate_group(n2, p2)
+  efficacy = 1 - risk2 / risk1
+  return(efficacy)
+}
+
+```
+
+## DST1 endpoint efficacy
+
+```{r, echo=TRUE, warnings=FALSE, message=FALSE,cache=TRUE}
+
+#Group 1-3 DST1
+DST1_endpoints = DST1_tot_def %>% filter(t==12 & is.element(Group,c(1,2,3))) %>% group_by(Treatment) %>% summarise(N=sum(S+R+C),I=sum(R+C))
+print(DST1_endpoints)
+
+DST1_eff <- comprehenr::to_vec(for (i in 1:10000) simulate_trial(DST1_endpoints$N[1],(DST1_endpoints$I[1])/(DST1_endpoints$N[1]),
+                                                                DST1_endpoints$N[2],(DST1_endpoints$I[2])/(DST1_endpoints$N[2])))
+
+DST1_eff <- signif(100*quantile(DST1_eff,c(0.025,0.5,0.975)),2)
+
+```
+DST 1 endpoint efficacy is `r DST1_eff[2]`%; 95% CI: `r DST1_eff[1]`-`r DST1_eff[3]`%
+
+## DST 10 endpoint efficacy
+
+```{r, echo=TRUE, warnings=FALSE, message=FALSE,cache=TRUE}
+
+DST10_endpoints = DST10_tot_def %>% filter(t==12 & is.element(Group,c(1,2,3))) %>% group_by(Treatment) %>% summarise(N=sum(S+R+C),I=sum(R+C))
+
+print(DST10_endpoints)
+
+DST10_eff <- comprehenr::to_vec(for (i in 1:10000) simulate_trial(DST10_endpoints$N[1],(DST10_endpoints$I[1])/(DST10_endpoints$N[1]),
+                                                                DST10_endpoints$N[2],(DST10_endpoints$I[2])/(DST10_endpoints$N[2])))
+
+DST10_eff <- signif(100*quantile(DST10_eff,c(0.025,0.5,0.975)),2)
+
+```
+
+DST 10 endpoint efficacy is `r DST10_eff[2]`%; 95% CI: `r DST10_eff[1]`-`r DST10_eff[3]`%
+
+## Visible lesions endpoint efficacy
+
+```{r, echo=TRUE, warnings=FALSE, message=FALSE,cache=TRUE}
+vl_endpoints <- vl_df %>% filter(is.element(Group,c(3,4)) & OrganPM=='Total')  %>% group_by(Treatment) %>% summarise(N=length(VL),I=sum(VL=='Yes'))
+
+print(vl_endpoints)
+
+vl_eff <- comprehenr::to_vec(for (i in 1:10000) simulate_trial(vl_endpoints$N[1],(vl_endpoints$I[1])/(vl_endpoints$N[1]),
+                                                                vl_endpoints$N[2],(vl_endpoints$I[2])/(vl_endpoints$N[2])))
+
+vl_eff <- signif(100*quantile(vl_eff,c(0.025,0.5,0.975)),2)
+
+```
+
+VL endpoint efficacy is `r vl_eff[2]`%; 95% CI: `r vl_eff[1]`-`r vl_eff[3]`%
