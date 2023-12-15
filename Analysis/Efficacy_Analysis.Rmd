@@ -325,6 +325,9 @@ bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Maximum',eff
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Maximum',efficacy='Infectiousness',value=1-exp(as.data.frame(stan_glm.fit10)[,3])))
 bayes_eff = bayes_eff %>% bind_rows(tibble(test='DST10',imputation='Maximum',efficacy='Total',value=1-(exp(rowSums(as.data.frame(stan_glm.fit10)[,2:3])))))
 
+save(bayes_eff,
+     file='./transmission_model/RData_files/vacc_eff.RData')
+
 ```
 
 
