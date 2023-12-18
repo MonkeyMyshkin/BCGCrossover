@@ -14,7 +14,7 @@ credible<-function(x)
 
 
 
-latent <- read.csv('TestAnon.csv')
+latent <- read.csv('./Data/TestAnon.csv')
 
 # Aggregate "Dairy Belt" locations around Addis to be coded as "Addis Ababa"
 latent$Site[!is.element(latent$Site,c("KOMBOLCHA","HAWASSA","MEKELLE"))] = 'ADDIS ABABA'
@@ -36,12 +36,8 @@ p2=ggplot(R0_by_herd,aes(x=N,y=R0))+ #col=site)) +
   ylab(expression(R[0])) + 
   xlab('Herd Size') + 
   geom_hline(yintercept = c(1.0/(1-0.558))) + 
-  geom_hline(yintercept = c(1.0/(1-0.25),1.0/(1-0.74)),lty=2) +
+  geom_hline(yintercept = c(1.0/(1-0.25),1.0/(1-0.74)),lty=2) 
 
-  #Critical values of R0 for total vaccine coverage
-  #geom_hline(yintercept = c(1.0/(1-0.89)),col='red') + 
-  #geom_hline(yintercept = c(1.0/(1-0.75),1.0/(1-0.96)),lty=2,col='red') 
-  
 
 mean_percent <- function(x){100*mean(x)}
 naive_errorL <- function(x){100*(mean(x)-sqrt(mean(x)*(1-mean(x)))/sqrt(length(x))) }
@@ -54,8 +50,8 @@ p1=ggplot(latent %>%
             pivot_longer(ends_with('T'),names_to='Test') ,aes(x=N,y=as.numeric(value),col=Test)) + 
  stat_summary_bin(fun=mean_percent,fun.min=naive_errorL,fun.max=naive_errorU,position=position_dodge(2))+xlab('Herd Size')+ylab('% Apparent Prevalence')
 
-png(filename='Supp_R0Fig.png',width = 20,height=7.5,units='cm',res=600)
-print(p1+p2)
-dev.off()
+
+ggsave(p1+p2, width=7.25, height=7.25/2.25,file="../Manuscript_figures/Fig_S6.pdf")
+
 
 

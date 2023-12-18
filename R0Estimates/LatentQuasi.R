@@ -6,7 +6,7 @@ require(parallel)
 require(tidyverse)
 require(tidybayes)
 
-latent <- read.csv('TestAnon.csv')
+latent <- read.csv('../Data/TestAnon.csv')
 
 source('./mk_list_for_stan.R')
 
