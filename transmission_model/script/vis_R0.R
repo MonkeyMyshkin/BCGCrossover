@@ -40,7 +40,7 @@ vis_R0_by_herd<-ggplot(R0_by_herd %>%
   xlab(' \nHerd size') + 
   theme_bw() + 
   theme(panel.grid.major.x = element_blank(), 
-        text=element_text(size=34,  family="Calibri"),
+        text=element_text(size=34,  family="sans"),
         axis.text.x = element_text(size = 30),
         axis.text.y = element_text(size = 30))+
   geom_hline(yintercept = c(1.0/(1-0.558))) + 

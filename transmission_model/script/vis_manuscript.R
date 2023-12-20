@@ -26,14 +26,14 @@ study_farms<-cowplot::plot_grid(
   label_size=40,
   label_x=-0.006, 
   label_y=1.01, 
-  label_fontfamily="serif",
+  label_fontfamily="sans",
   ncol=4,
   nrow=1)
 
 # extract the legend from one of the prevalence plots to assign single legend
 legend_prev <- cowplot::get_legend(
   prev_farms + 
-  theme(legend.box.margin = margin(t=15, r=0.5, b=5, l=165)))
+  theme(legend.box.margin = margin(t=15, r=0.5, b=5, l=105)))
 
 #combine prevalence figures
 prev<-cowplot::plot_grid(
@@ -46,7 +46,7 @@ prev<-cowplot::plot_grid(
   label_size=40,
   label_x=-0.006, 
   label_y=1.01,
-  label_fontfamily="serif",
+  label_fontfamily="sans",
   nrow=2)
   
 # add the legend to the plot
@@ -64,12 +64,12 @@ cowplot::plot_grid(
   label_size=40,
   label_x=-0.006, 
   label_y=1.01, 
-  label_fontfamily="serif",
+  label_fontfamily="sans",
   nrow=3)+
   theme(plot.background = element_rect(fill="white", color = NA))
 
 
-ggsave(paste("./transmission_model/figures/bTB_vacc_model", '.png', sep=""), width=19, height=27)
+ggsave(paste("./Manuscript_figures/Fig_3", '.png', sep=""), width=19, height=27)
 
 
 #supplementary figure
@@ -80,26 +80,24 @@ prev<-cowplot::plot_grid(
   NULL,
   prev_farms +
     theme(legend.position = "none"),
-  rel_heights = c(1, 0.08, 1), 
-  labels = c("A", "", "B"),
+  rel_heights = c(0.86, 1), 
+  labels = c("", ""),
   label_size=40,
   label_x=-0.006, 
   label_y=1.01, 
-  label_fontfamily="serif",
-  nrow=3)
+  label_fontfamily="sans",
+  nrow=2)
 
 # extract the legend from one of the prevalence plots to assign single legend
 legend_prev <- cowplot::get_legend(
   prev_farms + 
-    theme(legend.box.margin = margin(0.5, 0.5, 165, 0.5)) 
+    theme(legend.box.margin = margin(t=15, r=0.5, b=5, l=105)) 
 )
 
-
 prev2<-cowplot::plot_grid(prev, legend_prev, 
-                          rel_widths = c(3,  0.6),
-                          rel_heights = c(3,  0.6),
+                          rel_widths = c(5, 1),
+                          rel_heights = c(5, 0.2),
                           nrow=2)
-                          
 
-ggsave(paste("./transmission_model/figures/bTB_prev", '.png', sep=""), width=16, height=19)
+ggsave(paste("./Manuscript_figures/Fig_S10", '.png', sep=""), width=18, height=17)
 
