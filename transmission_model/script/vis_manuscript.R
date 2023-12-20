@@ -12,6 +12,7 @@ load(paste('./transmission_model/RData_files/vis_R0_by_herd', '.RData', sep=""))
 #load map of Ethiopia with study sites indicated
 #Map with first-level Administrative Divisions obtained from
 #https://earthworks.stanford.edu/catalog/stanford-gw295bx8934
+#please see file.edit("./transmission_model/script/study_sites.R")
 load(paste('./transmission_model/RData_files/ethiopia', '.RData', sep=""))
 
 #combine the figure of study sites and R0 by herd
@@ -70,6 +71,7 @@ cowplot::plot_grid(
 
 
 ggsave(paste("./Manuscript_figures/Fig_3", '.png', sep=""), width=19, height=27)
+
 
 
 #supplementary figure

@@ -80,6 +80,12 @@ source("./transmission_model/script/vis_combined_data.R")
 #visualise estimated R0 and herd size by herd and region
 source("./transmission_model/script/vis_R0.R")
 
+#visualise study sites
+#requires a shapefile with first-level administrative divisions of Ethiopia, obtained from
+#https://earthworks.stanford.edu/catalog/stanford-gw295bx8934
+#save the shapefile in a folder named 'gis' and place it the Data folder "./Data/gis"
+source("./transmission_model/script/study_sites.R")
+
 #create a combined plot of the estimated R0 and results from the transmission model
 source("./transmission_model/script/vis_manuscript.R")
 
