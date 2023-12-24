@@ -1,6 +1,6 @@
 ---
 title: "Endpoint Vaccine Efficacy (PM, DST 1 and DST 10)"
-author: "Andrew J K Conlan"
+author: "Andrew J K Conlan and Vivek Kapur"
 date: "2023-09-19"
 output: html_document
 ---
@@ -116,3 +116,98 @@ vl_eff <- signif(100*quantile(vl_eff,c(0.025,0.5,0.975)),2)
 ```
 
 VL endpoint efficacy is `r vl_eff[2]`%; 95% CI: `r vl_eff[1]`-`r vl_eff[3]`%
+
+
+# Summary figures of visible lesion scores (Fig_S2)
+
+```{r}
+
+# This script generates two box and whisker plots for Fig S2 to visually represent post-mortem (PM) data focused on visible lesions (VL) scores, complementing the data presented in Fig2. 
+# v122423 - fixed color schema for plot 2 to match Fig2 panels 3 and 4
+
+# Install and load required libraries if not already installed
+required_libraries <- c("tidyverse", "ggplot2", "ggsignif", "ggthemes", "scales", "patchwork")
+new_libraries <- required_libraries[!required_libraries %in% installed.packages()[,"Package"]]
+if(length(new_libraries)) install.packages(new_libraries)
+lapply(required_libraries, library, character.only = TRUE)
+
+# Import Total PM score data of Sentinels and seeders
+TotalVLScoresVivek <- read.csv('./TotalVLScoresVivekcsv.csv', stringsAsFactors = FALSE)
+
+# Define color vectors for each phase for Plot 1
+TotalVLScoresVivek$CombinedGroup <- with(TotalVLScoresVivek, 
+                                         ifelse(GroupCh == "Phase-I", 
+                                                paste(GroupCh, Treatment, sep="_"), 
+                                                paste(GroupCh, Treatment, sep="_")))
+
+plot1_custom_colors <- c("Phase-I_Control" = "#F090D4", "Phase-I_Vaccinated" = "#893DF6",
+                         "Phase-II_Control" = "#8ED5FB", "Phase-II_Vaccinated" = "#78CC6F")
+
+
+# Plot 1 - Phase I and Phase-II
+p1 = ggplot(data=TotalVLScoresVivek, aes(x = GroupCh, y = Score, fill = CombinedGroup)) +
+    geom_boxplot(width = 0.9, alpha=0.5) +
+    stat_boxplot(geom = "errorbar", width=0.4, size=0.8, position = position_dodge(0.9), alpha=0.7) +
+    geom_dotplot(binaxis = "y", stackdir = "center", binwidth = 1.6, position = position_dodge(0.9), dotsize = 1.4, alpha=0.8) +
+    scale_y_continuous(expand = c(0, 0)) +
+    expand_limits(y = c(-3, 125)) +
+    scale_y_continuous(breaks = seq(0, 125, 20)) + 
+    labs(title='A',
+         subtitle = "Visible Lesion Score by Study Phase", 
+         x = "Study Phase", 
+         y = "Visible Lesion Score",
+         fill = "Combined Group") +
+    scale_fill_manual(values = plot1_custom_colors) +
+    theme_bw() +
+    theme(
+        #text = element_text(size = 12, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5)
+    )
+
+# Save Plot 1
+# ggsave(file = "Boxlot_of_VL_Score_Phase-I_and_Phase-II.tiff", units = "in", width = 5.1, height = 3.5, dpi = 1200)
+
+# Import the sentinel PM data and filter the total score only for Plot 2
+TotalScoreSentinels <- read.csv('./PMScoreSentinelsscsv.csv', stringsAsFactors = FALSE) %>%
+    select(ID1, Exposure, Treatment, Group, OrganPM, Score) %>%
+    filter(OrganPM == "Total")
+
+# Ensure that Exposure and Treatment are factors with the correct levels for Plot 2
+TotalScoreSentinels$Exposure <- factor(TotalScoreSentinels$Exposure, levels = c("Control", "Vaccinate"))
+TotalScoreSentinels$Treatment <- factor(TotalScoreSentinels$Treatment, levels = c("Control", "Vaccinate"))
+
+# Create a new column that combines Phase-II Exposure and Treatment
+TotalScoreSentinels$ExposureTreatment <- with(TotalScoreSentinels, paste(Exposure, Treatment, sep = "_"))
+
+# Define custom colors based on the combined Exposure and Treatment for Plot 2
+custom_colors_plot2 <- c("Control_Control" = "#643F95", 
+                         "Control_Vaccinate" = "#AECDE1", 
+                         "Vaccinate_Control" = "#EF8632", 
+                         "Vaccinate_Vaccinate" = "#549E3F")
+
+# Plot 2 - Exposure to C and V with custom colors
+p2 = ggplot(TotalScoreSentinels, aes(x = Exposure, y = Score, fill = ExposureTreatment)) +
+    geom_boxplot(width = 0.9, alpha=0.5) +
+    stat_boxplot(geom = "errorbar", width=0.4, size=0.8, position = position_dodge(0.9), alpha=0.7) +
+    geom_dotplot(binaxis = "y", stackdir = "center", binwidth = 1.6, position = position_dodge(0.9), dotsize = 1.5, alpha=0.8) +
+    scale_y_continuous(expand = c(0, 0)) +
+    expand_limits(y = c(-3, 125)) +
+    scale_y_continuous(breaks = seq(0, 125, 20)) + 
+    labs(title='B',subtitle = "Visible Lesion Score by Exposure", 
+         x = "Exposure", 
+         y = "Visible Lesion Score",
+         fill="Exposure Treatment") +
+    scale_fill_manual(values = custom_colors_plot2) +
+    theme_bw() +
+    theme(
+        #text = element_text(size = 12, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5)
+    )
+
+# Save Plot 2
+#ggsave(file = "Boxplot_of_VL_Score_Sentinels_Phase-II_Exposure_Treatment.tiff", units = "in", width = 5.1, height = 3.5, dpi = 1200)
+print(p1+p2)
+ggsave(p1+p2,file = "../Manuscript_figures/Fig_S2.pdf", units = "in", width = 10.2, height = 3.5)
+
+
+```

@@ -1,11 +1,11 @@
 Supplementary data and code for:
 
-"BCG vaccination of cattle reduces transmission of bovine tuberculosis, improving the prospect of elimination" by Abebe Fromsa, Katriina Willgert, Sreenidhi Srinivasan, Getnet Mekonnen, Wegene Bedada, Balako Gumi, Matios Lakew, Biniam Tadesse, Berecha Bayissa, Asegedech Sirak, Musse Gima, Solomon Gebre, Tesfaye Rufael, Maroudam Veerasami, H. Martin Vordermeier, Douwe Bakker, Stefan Berg, Gobena Ameni, Nick Juleff,
+"Cattle vaccination limits the transmission of bovine tuberculosis, improving the prospects for elimination" by Abebe Fromsa, Katriina Willgert, Sreenidhi Srinivasan, Getnet Mekonnen, Wegene Bedada, Balako Gumi, Matios Lakew, Biniam Tadesse, Berecha Bayissa, Asegedech Sirak, Musse Gima, Solomon Gebre, Tesfaye Rufael, Maroudam Veerasami, H. Martin Vordermeier, Douwe Bakker, Stefan Berg, Gobena Ameni, Nick Juleff,
 Mart C.M. de Jong, James Wood, Andrew Conlan & Vivek Kapur with the ETHICOBOTS and ABTBC consortia.
 
 shared under Creative Commons Attribution-ShareAlike 4.0 licence.
 
-All Code written by Andrew J K Conlan and Katriina Willgert
+Code written by Andrew J K Conlan, Katriina Willgert and Vivek Kapur
 
 This readme file gives a brief description of the original data and scripts necessary to reproduce the analyses and figures presented in the manuscript.
 
