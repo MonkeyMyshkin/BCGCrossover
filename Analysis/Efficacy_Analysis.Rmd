@@ -78,7 +78,7 @@ DST1_tot_def <- DST1_tot_def %>% mutate(Phase = factor(Phase))
 
 DST1_tot_defp <- DST1_tot_defp %>% 
   mutate(plot_group=factor(plot_group,
-                           levels=c('Unvaccinated_FALSE','Unvaccinated_TRUE','Vaccinated_FALSE','Vaccinated_TRUE'),
+                           levels=c('Unvaccinated_FALSE','Vaccinated_FALSE','Unvaccinated_TRUE','Vaccinated_TRUE'),
                            labels=c('Unvaccinated-Unvaccinated','Unvaccinated-Vaccinated','Vaccinated-Unvaccinated','Vaccinated-Vaccinated')))
 
 p1=ggplot(DST1_tot_defp %>% group_by(t,Group,Treatment,plot_group) %>% summarise(R=sum(R+C)),aes(x=as.numeric(t),y=R,col=plot_group)) + 
@@ -88,8 +88,8 @@ p1=ggplot(DST1_tot_defp %>% group_by(t,Group,Treatment,plot_group) %>% summarise
   theme(legend.position = c(0.76,0.3)) + 
   #theme(legend.position = 'bottom') + 
   ggtitle('A')+ theme(text = element_text(size = 10),legend.text = element_text(size = 8))  + 
-  scale_color_manual(values=brewer.pal(10,'Paired')[c(10,8,1,4)]) + 
-  scale_fill_manual(values=brewer.pal(10,'Paired')[c(10,8,1,4)]) + labs(fill='Seeder-Sentinel',col='Seeder-Sentinel')
+  scale_color_manual(values=brewer.pal(10,'Paired')[c(10,1,8,4)]) + 
+  scale_fill_manual(values=brewer.pal(10,'Paired')[c(10,1,8,4)]) + labs(fill='Seeder-Sentinel',col='Seeder-Sentinel')
 
 
 print(p1)
@@ -266,8 +266,8 @@ credible <- function(x){data.frame(y=median(x),ymin=quantile(x,0.025),ymax=quant
 p3=ggplot(bayes_R0, aes(x=R0,fill=as.factor(group),col=as.factor(group))) + geom_density(alpha=0.5) + xlab('Experimental R') + labs(fill='Seeder-Sentinel',col='Seeder-Sentinel') + geom_vline(xintercept=1,linewidth=2) + ylab('Posterior Density') + 
   theme(legend.position = c(0.66,0.75)) + ggtitle('B') + 
   theme(text = element_text(size = 10),legend.text = element_text(size = 8))  + 
-  scale_color_manual(values=brewer.pal(10,'Paired')[c(10,8,1,4)]) + 
-  scale_fill_manual(values=brewer.pal(10,'Paired')[c(10,8,1,4)])
+  scale_color_manual(values=brewer.pal(10,'Paired')[c(10,1,8,4)]) + 
+  scale_fill_manual(values=brewer.pal(10,'Paired')[c(10,1,8,4)])
 #+  scale_colour_brewer(palette='Paired')  +  scale_fill_brewer(palette='Paired')  
 
 print(bayes_R0 %>% group_by(test,group) %>% summarise(R = signif(median(R0),3), 
