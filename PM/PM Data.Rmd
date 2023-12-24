@@ -1,5 +1,5 @@
 ---
-title: "Endpoint Vaccine Efficacy (PM, DST 1 and DST 10)"
+title: "Visible Lesion data (PM) and Endpoint Vaccine Efficacy Estimates (PM, DST 1 and DST 10)"
 author: "Andrew J K Conlan and Vivek Kapur"
 date: "2023-09-19"
 output: html_document
@@ -159,10 +159,14 @@ p1 = ggplot(data=TotalVLScoresVivek, aes(x = GroupCh, y = Score, fill = Combined
          fill = "Combined Group") +
     scale_fill_manual(values = plot1_custom_colors) +
     theme_bw() +
-    theme(
-        #text = element_text(size = 12, face = "bold"),
-        plot.subtitle = element_text(hjust = 0.5)
-    )
+    theme(legend.position=c(0.7,0.8),
+        legend.text = element_text(size = 8),
+        text = element_text(size = 10),
+        plot.subtitle = element_text(hjust = 0.5)) + 
+    annotate("text",x=1,y=125,label="p = 0.01") + 
+    annotate("text",x=2,y=75,label="p = 0.01") + 
+    annotate("segment",x=0.75,y=120,xend=1.25,yend=120)+ 
+    annotate("segment",x=1.75,y=70,xend=2.25,yend=70)
 
 # Save Plot 1
 # ggsave(file = "Boxlot_of_VL_Score_Phase-I_and_Phase-II.tiff", units = "in", width = 5.1, height = 3.5, dpi = 1200)
@@ -199,15 +203,19 @@ p2 = ggplot(TotalScoreSentinels, aes(x = Exposure, y = Score, fill = ExposureTre
          fill="Exposure Treatment") +
     scale_fill_manual(values = custom_colors_plot2) +
     theme_bw() +
-    theme(
-        #text = element_text(size = 12, face = "bold"),
-        plot.subtitle = element_text(hjust = 0.5)
-    )
+    theme(legend.position=c(0.7,0.8),
+          legend.text = element_text(size = 8),
+        text = element_text(size = 10),
+        plot.subtitle = element_text(hjust = 0.5)) +    
+    annotate("text",x=1,y=75,label="p = 0.01") + 
+    annotate("text",x=2,y=75,label="p = 0.25") + 
+    annotate("segment",x=0.75,y=70,xend=1.25,yend=70)+ 
+    annotate("segment",x=1.75,y=70,xend=2.25,yend=70)
 
 # Save Plot 2
 #ggsave(file = "Boxplot_of_VL_Score_Sentinels_Phase-II_Exposure_Treatment.tiff", units = "in", width = 5.1, height = 3.5, dpi = 1200)
 print(p1+p2)
-ggsave(p1+p2,file = "../Manuscript_figures/Fig_S2.pdf", units = "in", width = 10.2, height = 3.5)
+ggsave(p1+p2,file = "../Manuscript_figures/Fig_S2.pdf", units = "in", width = 7.25, height = 5.0)
 
 
 ```
