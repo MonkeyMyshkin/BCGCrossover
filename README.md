@@ -37,7 +37,7 @@ Animals were tested at two month intervals using a set of diagnostic tests (Dx):
 
 IGRA: PPD-A, PPDB with difference PPD(B-A)
 DST: DST1, DST0.1, DST0.01 (Different dilutions of the defined DST antigens)
-Skin tests: SIT, SICCT (Single Intradermal Comparative Cervical Tuberculin test, described using contracted form SCT in manuscript), DST10
+Skin tests: SIT, SICCT (Single Intradermal Comparative Cervical Tuberculin test, described using contracted form CCT in manuscript), DST10
 
 In Phase II, sentinel animals were grouped in two batches (I, II) for testing reflecting the staggered entry of these animals and different periods of exposure to seeder animals.
 
@@ -57,7 +57,7 @@ These raw data tables were processed to make curated data tables used for the tr
 
 "TestAnon.csv"
 
-Individual animal test results (logical TRUE or FALSE) for the SIT (coded as PPDB) and SCT (coded as PPDBA) grouped by herd (g). Herd identidies are anonymised, but stratified by the Site (ADDIS ABABA, SULUTA, SENDAFA, KOMBOLCHA, DEBRE-ZEIT, SEBETA, HAWASSA, MEKELLE, GONDAR, HOLETA) and study ID (1 (Ethicobots Round 1), 2 (Ethicobots Round 2), Firdessa, NAHDIC) relating to when and where the tests were carried out.
+Individual animal test results (logical TRUE or FALSE) for the SIT (coded as PPDB, i.e. bovine PPD response) and SICCT/CCT (coded as PPDBA, i.e. difference between Bovine and Avian PPD response) grouped by herd (g). Herd identifiers are anonymised, but stratified by the Site (ADDIS ABABA, SULUTA, SENDAFA, KOMBOLCHA, DEBRE-ZEIT, SEBETA, HAWASSA, MEKELLE, GONDAR, HOLETA) and study ID (1 (Ethicobots Round 1), 2 (Ethicobots Round 2), Firdessa, NAHDIC) relating to when and where the tests were carried out.
 
 ## Ethicobots herd demography 
 
