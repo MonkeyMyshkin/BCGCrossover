@@ -54,7 +54,7 @@ examplar_exp <- examplar_exp %>% bind_rows(oot %>% mutate(efficacy = 1-(V/(V+SV)
 
 examplar_exp <- examplar_exp %>% mutate(FOI=factor(FOI,levels=c('Low','Mid','High')))
 
-ggplot(examplar_exp,aes(x=time,y=100*efficacy,col=FOI)) + geom_path(size=2) + 
+endpoint_fig <- ggplot(examplar_exp,aes(x=time,y=100*efficacy,col=FOI)) + geom_path(linewidth=2) + 
  xlab('Time (Months)') + ylab('% Endpoint Efficacy')  
 
-
+ggsave(endpoint_fig, width=4.75, height=4.75*0.8,file="../Manuscript_figures/Fig_S1.pdf")
