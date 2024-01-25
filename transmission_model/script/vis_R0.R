@@ -4,7 +4,7 @@
 load('./transmission_model/RData_files/parsInf.RData') 
 
 #read site data for R0 estimates
-latent <- read.csv('./R0Estimates/TestAnon.csv')
+latent <- read.csv('./Data/TestAnon.csv')
 
 #Aggregate farms around Addis Ababa to be coded as "Addis Ababa"
 latent$Site[!is.element(latent$Site,c("KOMBOLCHA","HAWASSA","MEKELLE"))] = 'ADDIS ABABA'

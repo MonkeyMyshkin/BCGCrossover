@@ -5,7 +5,7 @@
 R0_prevM<-read.csv(file = './R0Estimates/R0Estimates.csv')
 
 #anonymous test data for each animal. g=farm
-testDat<-read.csv(file = './R0Estimates/TestAnon.csv')
+testDat<-read.csv(file = './Data/TestAnon.csv')
 
 
 #Mean and standard deviation of posterior estimates of the mortality rate of all herds included 
