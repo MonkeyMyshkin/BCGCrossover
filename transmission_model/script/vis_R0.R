@@ -43,7 +43,7 @@ vis_R0_by_herd<-ggplot(R0_by_herd %>%
         text=element_text(size=34,  family="sans"),
         axis.text.x = element_text(size = 30),
         axis.text.y = element_text(size = 30))+
-  geom_hline(yintercept = c(1.0/(1-0.558))) + 
-  geom_hline(yintercept = c(1.0/(1-0.25),1.0/(1-0.74)),lty=2)
+  geom_hline(yintercept = c(1.0/(1-0.58))) + 
+  geom_hline(yintercept = c(1.0/(1-0.89)),lty=2)
 
 save(vis_R0_by_herd, file=paste('./transmission_model/RData_files/vis_R0_by_herd', '.RData', sep=""))
